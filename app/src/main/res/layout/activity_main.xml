@@ -23,15 +23,6 @@
         android:layout_marginBottom="16dp" />
 
     <Button
-        android:id="@+id/convertButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="✨ Female Voice এ Convert করুন"
-        android:enabled="false"
-        android:textSize="16sp"
-        android:layout_marginBottom="16dp" />
-
-    <Button
         android:id="@+id/playButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

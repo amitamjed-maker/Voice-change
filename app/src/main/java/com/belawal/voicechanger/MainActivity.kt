@@ -33,7 +33,6 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
     private lateinit var recordButton: Button
-    private lateinit var convertButton: Button
     private lateinit var playButton: Button
     private lateinit var shareButton: Button
 
@@ -56,12 +55,10 @@ class MainActivity : AppCompatActivity() {
 
         statusText = findViewById(R.id.statusText)
         recordButton = findViewById(R.id.recordButton)
-        convertButton = findViewById(R.id.convertButton)
         playButton = findViewById(R.id.playButton)
         shareButton = findViewById(R.id.shareButton)
 
         recordButton.setOnClickListener { onRecordClicked() }
-        convertButton.setOnClickListener { onConvertClicked() }
         playButton.setOnClickListener { onPlayClicked() }
         shareButton.setOnClickListener { onShareClicked() }
     }
@@ -100,10 +97,9 @@ class MainActivity : AppCompatActivity() {
 
         isRecording = true
         recordButton.text = "⏹️ Record বন্ধ করুন"
-        convertButton.isEnabled = false
         playButton.isEnabled = false
         shareButton.isEnabled = false
-        statusText.text = "Recording চলছে..."
+        statusText.text = "Recording চলছে... (আবার চাপুন থামাতে)"
 
         audioRecord?.startRecording()
 
@@ -125,42 +121,38 @@ class MainActivity : AppCompatActivity() {
         audioRecord = null
 
         recordButton.text = "🎙️ Record শুরু করুন"
-        statusText.text = "Record শেষ। এবার Convert করুন।"
+        recordButton.isEnabled = false
+        statusText.text = "Voice convert হচ্ছে..."
 
         // small delay isn't needed; the writer thread finishes its last write quickly,
         // but to be safe we wrap on a short background delay before touching the file.
         thread {
             Thread.sleep(150)
             WavUtils.pcmFileToWav(rawPcmFile, originalWavFile, sampleRate)
-            runOnUiThread {
-                convertButton.isEnabled = true
-            }
+            convertRecording()
         }
     }
 
-    // ---------- Conversion ----------
+    // ---------- Conversion (runs automatically right after recording stops) ----------
 
-    private fun onConvertClicked() {
-        statusText.text = "Voice convert হচ্ছে..."
-        convertButton.isEnabled = false
-
-        thread {
-            try {
-                val wav = WavUtils.readWav(originalWavFile)
-                val shifted = PitchShifter.shiftPitch(wav.samples, PitchShifter.MALE_TO_FEMALE_PITCH)
-                WavUtils.writeWav(convertedWavFile, shifted, wav.sampleRate)
-                runOnUiThread {
-                    statusText.text = "Convert সম্পন্ন ✔️"
-                    playButton.isEnabled = true
-                    shareButton.isEnabled = true
-                    convertButton.isEnabled = true
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    statusText.text = "Convert ব্যর্থ হয়েছে"
-                    convertButton.isEnabled = true
-                    Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+    private fun convertRecording() {
+        try {
+            val wav = WavUtils.readWav(originalWavFile)
+            val shifted = PitchShifter.shiftPitch(
+                wav.samples, wav.sampleRate, PitchShifter.MALE_TO_FEMALE_PITCH
+            )
+            WavUtils.writeWav(convertedWavFile, shifted, wav.sampleRate)
+            runOnUiThread {
+                statusText.text = "Convert সম্পন্ন ✔️ — এখন শুনুন বা পাঠান"
+                playButton.isEnabled = true
+                shareButton.isEnabled = true
+                recordButton.isEnabled = true
+            }
+        } catch (e: Exception) {
+            runOnUiThread {
+                statusText.text = "Convert ব্যর্থ হয়েছে"
+                recordButton.isEnabled = true
+                Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
