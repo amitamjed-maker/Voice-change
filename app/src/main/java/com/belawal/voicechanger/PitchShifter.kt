@@ -28,8 +28,8 @@ import kotlin.math.sqrt
  */
 object PitchShifter {
 
-    /** Recommended pitch factor for a natural-sounding male -> female conversion. */
-    const val MALE_TO_FEMALE_PITCH = 1.35
+    /** Recommended pitch factor for a clearly feminine male -> female conversion. */
+    const val MALE_TO_FEMALE_PITCH = 1.55
 
     fun shiftPitch(
         input: ShortArray,
@@ -47,10 +47,14 @@ object PitchShifter {
         val stretched = wsola(resampled, pitchFactor)
 
         // Step 3: brighten the tone so it doesn't sound like a flat pitch-up
-        val brightened = brighten(stretched, gain = 0.22)
+        val brightened = brighten(stretched, gain = 0.28)
 
-        return ShortArray(brightened.size) { i ->
-            brightened[i].roundToInt().coerceIn(-32768, 32767).toShort()
+        // Step 4: soft-normalize the peak so brightening/overlap-add never
+        // hard-clips -> hard clipping is what causes the "cracked/broken" sound.
+        val safe = normalizePeak(brightened, targetPeak = 28000.0)
+
+        return ShortArray(safe.size) { i ->
+            safe[i].roundToInt().coerceIn(-32768, 32767).toShort()
         }
     }
 
@@ -95,6 +99,18 @@ object PitchShifter {
             prev = input[i]
         }
         return out
+    }
+
+    /** Scales the whole buffer down (never up) so its peak sits at [targetPeak] instead of clipping. */
+    private fun normalizePeak(input: DoubleArray, targetPeak: Double): DoubleArray {
+        var peak = 0.0
+        for (v in input) {
+            val a = kotlin.math.abs(v)
+            if (a > peak) peak = a
+        }
+        if (peak <= targetPeak || peak == 0.0) return input
+        val scale = targetPeak / peak
+        return DoubleArray(input.size) { input[it] * scale }
     }
 
     /** Output length ~= input.size * stretchFactor, pitch of [input] is preserved. */

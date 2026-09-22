@@ -30,6 +30,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rawPcmFile: File
     private lateinit var originalWavFile: File
     private lateinit var convertedWavFile: File
+    private var recordingThread: Thread? = null
 
     private lateinit var statusText: TextView
     private lateinit var recordButton: Button
@@ -103,7 +104,7 @@ class MainActivity : AppCompatActivity() {
 
         audioRecord?.startRecording()
 
-        thread {
+        recordingThread = thread {
             FileOutputStream(rawPcmFile).use { out ->
                 val buffer = ByteArray(bufSize)
                 while (isRecording) {
@@ -116,6 +117,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopRecording() {
         isRecording = false
+        // Wait for the recording thread to notice the flag and finish writing
+        // BEFORE stopping/releasing AudioRecord — doing it in the other order
+        // truncates/corrupts the tail of the buffer and is what caused the
+        // "cracked" / distorted sound.
+        recordingThread?.join(1000)
+        recordingThread = null
+
         audioRecord?.stop()
         audioRecord?.release()
         audioRecord = null
